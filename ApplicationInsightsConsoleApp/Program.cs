@@ -6,36 +6,21 @@
     using Microsoft.Extensions.Hosting;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
+    using Microsoft.ApplicationInsights.Channel;
+    using Microsoft.ApplicationInsights.Extensibility;
 
     #endregion
 
-    public interface IMainRunner
-    {
-        public Task<int> RunAsync();
-    }
-
-    public class MainRunner : IMainRunner
-    {
-        private readonly ILogger<MainRunner> _logger;
-
-        public MainRunner(ILogger<MainRunner> logger)
-        {
-            _logger = logger;
-        }
-
-        public async Task<int> RunAsync()
-        {
-            await Task.Run(() =>
-            {
-                _logger.LogInformation("Hello from Main Runner!");
-            });
-
-            return 0;
-        }
-    }
-
     public class Program
     {
+        #region Fields
+
+        private const string AppSettingsFileName = "appsettings.json";
+
+        #endregion
+
+        #region Main Method
+
         public static async Task<int> Main(string[] args)
         {
             var hostBuilder = CreateHostBuilder(args);
@@ -49,28 +34,52 @@
             return taskResult;
         }
 
-        public static IHostBuilder CreateHostBuilder(string[] args)
-        {
-            var configuration = new ConfigurationBuilder()
-                .AddEnvironmentVariables()
-                .AddCommandLine(args)
-                .AddJsonFile("appsettings.json")
-                .Build();
+        #endregion
 
+        #region Private Methods
+
+        private static IHostBuilder CreateHostBuilder(string[] args)
+        {
             return Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    SetServices(services);
+                    SetServices(hostContext, services);
                 })
-                .ConfigureAppConfiguration( builder =>
+                .ConfigureAppConfiguration( (builder) =>
                 {
-                    builder.AddConfiguration(configuration);
+                    builder.AddConfiguration(BuildingConfigurationBuilder(args));
                 });
         }
 
-        private static void SetServices(IServiceCollection services)
+        private static IConfigurationRoot BuildingConfigurationBuilder(string[] args)
         {
+            return new ConfigurationBuilder()
+                .AddEnvironmentVariables()
+                .AddCommandLine(args)
+                .AddJsonFile(AppSettingsFileName)
+                .Build();
+        }
+
+        private static void SetServices(
+            HostBuilderContext hostBuilderContext, 
+            IServiceCollection services)
+        {
+            services.Configure<TelemetryConfiguration>(config => config.TelemetryChannel = new InMemoryChannel());
+            services.AddLogging(builder =>
+            {
+                builder.AddApplicationInsights(
+                    configureTelemetryConfiguration: (config) => 
+                    {
+                        config.ConnectionString = hostBuilderContext
+                        .Configuration["ApplicationInsights:InstrumentationKey"];
+                    },
+                    configureApplicationInsightsLoggerOptions: (options) => { }
+                );
+            });
+
             services.AddTransient<IMainRunner, MainRunner>();
         }
+
+        #endregion
     }
 }
