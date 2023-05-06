@@ -23,15 +23,25 @@
 
         public static async Task<int> Main(string[] args)
         {
-            var hostBuilder = CreateHostBuilder(args);
+            try
+            {
+                var hostBuilder = CreateHostBuilder(args);
 
-            var host = hostBuilder.Build();
+                var host = hostBuilder.Build();
 
-            var taskResult = await host.Services.GetRequiredService<IMainRunner>().RunAsync();
+                var taskResult = await host.Services.GetRequiredService<IMainRunner>().RunAsync();
 
-            host.Dispose();
+                host.Dispose();
 
-            return taskResult;
+                return taskResult;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Exception Message: {e.Message}");
+                Console.WriteLine($"Exception HResult: {e.HResult}");
+                
+                return -1;
+            }
         }
 
         #endregion
